@@ -1,0 +1,177 @@
+desc: Rossow Reverb LiquidSonic
+tags: reverb, modulation, plates
+author: Custom JSFX
+version: 1.0
+
+// GUI and control parameters
+slider1:size=50<0,100,0.1>Size
+slider2:predelay=0<0,100,0.1>Predelay
+slider3:chorus=0<0,100,0.1>Chorus
+slider4:width=50<0,100,0.1>Width
+slider5:decay=50<0,100,0.1>Decay
+slider6:output=0<-12,12,0.1>Output (dB)
+slider7:dry_wet=50<0,100,0.1>Dry/Wet
+
+@init
+// Constants
+MAX_DELAY = 192000; // Maximum delay buffer size (4 seconds at 48kHz)
+CHORUS_MAX = 2048;   // Maximum chorus buffer size
+
+// Initialize delay buffers
+delay_buffer_l = 0;
+delay_buffer_r = MAX_DELAY;
+chorus_buffer_l = 2 * MAX_DELAY;
+chorus_buffer_r = 2 * MAX_DELAY + CHORUS_MAX;
+
+// Clear all buffers
+memset(delay_buffer_l, 0, MAX_DELAY);
+memset(delay_buffer_r, 0, MAX_DELAY);
+memset(chorus_buffer_l, 0, CHORUS_MAX);
+memset(chorus_buffer_r, 0, CHORUS_MAX);
+
+// LFO initialization
+lfo_phase = 0;
+lfo_inc = 2 * $pi / srate * 0.5; // 0.5 Hz default
+
+// Initialize reverb parameters
+buffer_index = 0;
+chorus_index = 0;
+
+@slider
+// Convert slider values to usable parameters
+size_ms = size * 5;           // 0-500ms
+predelay_ms = predelay * 2;   // 0-200ms
+chorus_amount = chorus / 100;  // 0-1
+width_amount = width / 100;    // 0-1
+decay_amount = decay / 100;    // 0-1
+output_gain = 10^(output/20);  // Convert dB to gain
+mix = dry_wet / 100;          // 0-1
+
+// Calculate buffer sizes
+size_samples = floor(size_ms * srate / 1000);
+predelay_samples = floor(predelay_ms * srate / 1000);
+
+@sample
+// Input with predelay
+inL = spl0;
+inR = spl1;
+
+// Apply predelay
+predelay_pos = buffer_index - predelay_samples;
+predelay_pos < 0 ? predelay_pos += MAX_DELAY;
+pre_l = delay_buffer_l[predelay_pos];
+pre_r = delay_buffer_r[predelay_pos];
+
+// Update LFO for chorus
+lfo_phase += lfo_inc;
+lfo_phase >= 2*$pi ? lfo_phase -= 2*$pi;
+lfo_val = sin(lfo_phase) * chorus_amount;
+
+// Chorus processing
+chorus_offset = floor(CHORUS_MAX * 0.5 * (1 + lfo_val));
+chorus_pos = chorus_index - chorus_offset;
+chorus_pos < 0 ? chorus_pos += CHORUS_MAX;
+
+// Store in chorus buffer
+chorus_buffer_l[chorus_index] = pre_l;
+chorus_buffer_r[chorus_index] = pre_r;
+
+// Read from chorus buffer with modulation
+chorus_l = chorus_buffer_l[chorus_pos];
+chorus_r = chorus_buffer_r[chorus_pos];
+
+// Apply width processing
+width_l = 0.5 * ((1 + width_amount) * chorus_l + (1 - width_amount) * chorus_r);
+width_r = 0.5 * ((1 - width_amount) * chorus_l + (1 + width_amount) * chorus_r);
+
+// Store in main delay buffer
+delay_buffer_l[buffer_index] = width_l * decay_amount;
+delay_buffer_r[buffer_index] = width_r * decay_amount;
+
+// Final mix
+spl0 = (inL * (1 - mix) + width_l * mix) * output_gain;
+spl1 = (inR * (1 - mix) + width_r * mix) * output_gain;
+
+// Update indices
+buffer_index += 1;
+buffer_index >= MAX_DELAY ? buffer_index = 0;
+chorus_index += 1;
+chorus_index >= CHORUS_MAX ? chorus_index = 0;
+
+@gfx 640 400
+// Set background color
+gfx_clear = 0x202020;
+
+function draw_knob(x, y, value, name, bipolar) (
+    // Knob dimensions
+    knob_radius = 25;
+    
+    // Draw knob background
+    gfx_set(0.3, 0.3, 0.3, 1);
+    gfx_circle(x + knob_radius, y + knob_radius, knob_radius, 1, 1);
+    
+    // Draw knob indicator
+    angle = value * (bipolar ? 2 : 1) * $pi - (bipolar ? $pi : 0);
+    ind_x = x + knob_radius + cos(angle) * (knob_radius * 0.8);
+    ind_y = y + knob_radius + sin(angle) * (knob_radius * 0.8);
+    gfx_set(0.8, 0.8, 0.8, 1);
+    gfx_line(x + knob_radius, y + knob_radius, ind_x, ind_y);
+    
+    // Draw label
+    gfx_setfont(1, "Arial", 14);
+    gfx_x = x + knob_radius - gfx_texth;
+    gfx_y = y + 2 * knob_radius + 5;
+    gfx_drawstr(name);
+    
+    // Draw value
+    gfx_x = x + knob_radius - gfx_texth;
+    gfx_y = y - 15;
+    value_str = sprintf(#, "%.1f", value * (bipolar ? 200-100 : 100));
+    gfx_drawstr(value_str);
+);
+
+// Draw main title
+gfx_setfont(2, "Arial", 18);
+gfx_set(0.9, 0.9, 0.9, 1);
+gfx_x = 20;
+gfx_y = 20;
+gfx_drawstr("Rossow Reverb LiquidSonic");
+
+// Draw knobs
+spacing = 90;
+base_x = 50;
+base_y = 80;
+
+draw_knob(base_x, base_y, size/100, "Size", 0);
+draw_knob(base_x + spacing, base_y, predelay/100, "Predelay", 0);
+draw_knob(base_x + spacing*2, base_y, chorus/100, "Chorus", 0);
+draw_knob(base_x + spacing*3, base_y, width/100, "Width", 0);
+
+// Second row
+base_y += 120;
+draw_knob(base_x + spacing, base_y, decay/100, "Decay", 0);
+draw_knob(base_x + spacing*2, base_y, (output+12)/24, "Output", 1);
+draw_knob(base_x + spacing*3, base_y, dry_wet/100, "Dry/Wet", 0);
+
+// Draw VU meter
+function draw_vu_meter(x, y, value) (
+    meter_width = 150;
+    meter_height = 10;
+    gfx_set(0.2, 0.2, 0.2, 1);
+    gfx_rect(x, y, meter_width, meter_height);
+    value = min(max(value, 0), 1);
+    gfx_set(0.2, 0.8, 0.2, 1);
+    gfx_rect(x, y, meter_width * value, meter_height);
+);
+
+// Draw output level meters
+draw_vu_meter(base_x + spacing, base_y + 100, abs(spl0));
+draw_vu_meter(base_x + spacing, base_y + 115, abs(spl1));
+
+// Handle mouse interaction for knobs
+mouse_cap && mouse_y >= 80 ? (
+    mouse_x >= base_x && mouse_x < base_x + spacing ? slider1 = 100 * (mouse_y - 80) / 100 :
+    mouse_x >= base_x + spacing && mouse_x < base_x + spacing*2 ? slider2 = 100 * (mouse_y - 80) / 100 :
+    mouse_x >= base_x + spacing*2 && mouse_x < base_x + spacing*3 ? slider3 = 100 * (mouse_y - 80) / 100 :
+    mouse_x >= base_x + spacing*3 && mouse_x < base_x + spacing*4 ? slider4 = 100 * (mouse_y - 80) / 100;
+);
