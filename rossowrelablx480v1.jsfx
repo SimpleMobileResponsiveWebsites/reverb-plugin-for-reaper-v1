@@ -1,0 +1,205 @@
+desc: Rossow Reverb Relab LX480 v1
+tags: reverb, algorithmic, vintage
+author: Custom JSFX
+version: 1.0
+
+// Control parameters
+slider1:program=0<0,7,1{Hall,Random Hall,Plate,Room,Chamber,Random Space,Dual Echo,Twin Delays}>Program
+slider2:decay=2.5<0.1,20,0.1>Decay Time (s)
+slider3:predelay=0<0,100,1>Predelay (ms)
+slider4:size=40<10,100,1>Size (m)
+slider5:diffusion=70<0,100,1>Diffusion
+slider6:low_decay=1<0.2,2,0.01>Low Decay
+slider7:high_decay=0.8<0.2,2,0.01>High Decay
+slider8:bass=0<-12,12,0.1>Bass (dB)
+slider9:treble=0<-12,12,0.1>Treble (dB)
+slider10:input=0<-12,12,0.1>Input (dB)
+slider11:output=0<-12,12,0.1>Output (dB)
+slider12:dry_wet=100<0,100,1>Dry/Wet
+
+@init
+// Buffer initialization
+MAX_DELAY = 192000; // 4 seconds at 48kHz
+buffer_index = 0;
+decay_buffer_l = 0;
+decay_buffer_r = MAX_DELAY;
+
+// Clear buffers
+memset(decay_buffer_l, 0, MAX_DELAY);
+memset(decay_buffer_r, 0, MAX_DELAY);
+
+// Initialize filters
+freq_lp = 0.1; // Low-pass filter coefficient
+freq_hp = 0.9; // High-pass filter coefficient
+lp1_l = lp1_r = 0;
+hp1_l = hp1_r = 0;
+
+// Initialize modulation
+lfo_phase = 0;
+lfo_freq = 0.5; // 0.5 Hz
+lfo_depth = 0.3;
+
+@slider
+// Convert slider values
+decay_samples = floor(decay * srate);
+predelay_samples = floor(predelay * srate / 1000);
+input_gain = 10^(input/20);
+output_gain = 10^(output/20);
+mix = dry_wet / 100;
+
+// Program-specific parameters
+program == 0 ? ( // Hall
+  size_mod = 1.2;
+  diff_mod = 1.0;
+) : program == 1 ? ( // Random Hall
+  size_mod = 1.3;
+  diff_mod = 1.1;
+) : program == 2 ? ( // Plate
+  size_mod = 0.8;
+  diff_mod = 1.4;
+) : program == 3 ? ( // Room
+  size_mod = 0.6;
+  diff_mod = 0.9;
+) : program == 4 ? ( // Chamber
+  size_mod = 0.9;
+  diff_mod = 1.2;
+) : ( // Others
+  size_mod = 1.0;
+  diff_mod = 1.0;
+);
+
+@sample
+// Input processing
+inL = spl0 * input_gain;
+inR = spl1 * input_gain;
+
+// Modulation
+lfo_phase += 2 * $pi * lfo_freq / srate;
+lfo_phase >= 2 * $pi ? lfo_phase -= 2 * $pi;
+mod = sin(lfo_phase) * lfo_depth;
+
+// Size and diffusion modulation
+current_size = size * size_mod * (1 + mod * 0.1);
+current_diff = diffusion * diff_mod;
+
+// Apply predelay
+pre_pos = buffer_index - predelay_samples;
+pre_pos < 0 ? pre_pos += MAX_DELAY;
+
+// Process early reflections
+early_l = decay_buffer_l[pre_pos];
+early_r = decay_buffer_r[pre_pos];
+
+// Low/High decay processing
+lp1_l = lp1_l * (1-freq_lp) + early_l * freq_lp;
+lp1_r = lp1_r * (1-freq_lp) + early_r * freq_lp;
+hp1_l = early_l - lp1_l;
+hp1_r = early_r - lp1_r;
+
+// Apply decay and filters
+decay_buffer_l[buffer_index] = (lp1_l * low_decay + hp1_l * high_decay) * exp(-current_size/decay_samples);
+decay_buffer_r[buffer_index] = (lp1_r * low_decay + hp1_r * high_decay) * exp(-current_size/decay_samples);
+
+// Mix wet and dry
+wetL = decay_buffer_l[buffer_index];
+wetR = decay_buffer_r[buffer_index];
+spl0 = (inL * (1-mix) + wetL * mix) * output_gain;
+spl1 = (inR * (1-mix) + wetR * mix) * output_gain;
+
+// Update buffer index
+buffer_index += 1;
+buffer_index >= MAX_DELAY ? buffer_index = 0;
+
+@gfx 400 600
+// Background
+gfx_clear = 0x202020;
+
+function draw_led_display(x, y, w, h) (
+    // Background
+    gfx_set(0.1, 0.1, 0.1, 1);
+    gfx_rect(x, y, w, h);
+    
+    // Draw grid
+    gfx_set(0.3, 0, 0, 0.5);
+    spacing_x = w/20;
+    spacing_y = h/10;
+    i = 0;
+    loop(21,
+        gfx_line(x + i*spacing_x, y, x + i*spacing_x, y + h);
+        i += 1;
+    );
+    i = 0;
+    loop(11,
+        gfx_line(x, y + i*spacing_y, x + w, y + i*spacing_y);
+        i += 1;
+    );
+    
+    // Draw frequency response curve
+    gfx_set(1, 0, 0, 1);
+    prev_x = x;
+    prev_y = y + h/2;
+    i = 0;
+    loop(w,
+        freq = i/w * $pi;
+        response = sin(freq*8) * exp(-freq*2) * h/3;
+        gfx_line(prev_x, prev_y, x + i, y + h/2 - response);
+        prev_x = x + i;
+        prev_y = y + h/2 - response;
+        i += 1;
+    );
+);
+
+function draw_button(x, y, w, h, text, active) (
+    gfx_set(active ? 0.8 : 0.4, active ? 0.8 : 0.4, active ? 0.8 : 0.4, 1);
+    gfx_rect(x, y, w, h);
+    gfx_set(0, 0, 0, 1);
+    gfx_x = x + w/2 - 20;
+    gfx_y = y + h/2 - 5;
+    gfx_drawstr(text);
+);
+
+// Draw LED display
+draw_led_display(50, 50, 300, 150);
+
+// Program selection buttons
+button_w = 60;
+button_h = 30;
+button_x = 50;
+button_y = 220;
+
+draw_button(button_x, button_y, button_w, button_h, "HALL", program == 0);
+draw_button(button_x + button_w + 10, button_y, button_w, button_h, "RAND", program == 1);
+draw_button(button_x + (button_w + 10) * 2, button_y, button_w, button_h, "PLATE", program == 2);
+draw_button(button_x + (button_w + 10) * 3, button_y, button_w, button_h, "ROOM", program == 3);
+
+// Parameter sliders
+function draw_param_slider(x, y, w, value, text) (
+    gfx_set(0.3, 0.3, 0.3, 1);
+    gfx_rect(x, y, w, 15);
+    gfx_set(0.8, 0.8, 0.8, 1);
+    gfx_rect(x, y, w * value, 15);
+    gfx_set(1, 1, 1, 1);
+    gfx_x = x;
+    gfx_y = y - 15;
+    gfx_drawstr(text);
+);
+
+slider_x = 50;
+slider_y = 300;
+slider_w = 300;
+
+draw_param_slider(slider_x, slider_y, slider_w, decay/20, "DECAY");
+draw_param_slider(slider_x, slider_y + 40, slider_w, predelay/100, "PREDELAY");
+draw_param_slider(slider_x, slider_y + 80, slider_w, size/100, "SIZE");
+draw_param_slider(slider_x, slider_y + 120, slider_w, diffusion/100, "DIFFUSION");
+draw_param_slider(slider_x, slider_y + 160, slider_w, dry_wet/100, "DRY/WET");
+
+// Handle mouse input for buttons
+mouse_cap & 1 ? (
+    mouse_y >= button_y && mouse_y <= button_y + button_h ? (
+        mouse_x >= button_x && mouse_x <= button_x + button_w ? slider1 = 0;
+        mouse_x >= button_x + button_w + 10 && mouse_x <= button_x + button_w * 2 + 10 ? slider1 = 1;
+        mouse_x >= button_x + (button_w + 10) * 2 && mouse_x <= button_x + button_w * 3 + 20 ? slider1 = 2;
+        mouse_x >= button_x + (button_w + 10) * 3 && mouse_x <= button_x + button_w * 4 + 30 ? slider1 = 3;
+    );
+);
