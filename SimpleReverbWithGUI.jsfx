@@ -1,0 +1,102 @@
+desc: Simple Reverb with GUI
+// Tags: reverb, delay, GUI
+// A simple reverb plugin for Reaper with a basic graphical interface.
+
+// @init section
+@init
+// GUI Settings
+gfx_clear = 0x333333; // Background color (dark gray)
+font_color = 0xFFFFFF; // Text color (white)
+slider_color = 0x999999; // Slider color (light gray)
+
+// Initialize parameters
+room_size = 0.5;
+damping = 0.5;
+mix = 0.3;
+
+max_delay_samples = 44100; // Max delay of ~1 second for 44100 Hz
+delay_bufferL = 0;
+delay_bufferR = 0;
+delay_index = 0;
+delay_bufferL = max_delay_samples;
+delay_bufferR = max_delay_samples;
+loop(44100, delay_bufferL[0] = delay_bufferR[0] = 0;); // Clear buffers
+
+// Slider variables
+slider1:Room Size=0.5<0,1,0.01> // Room size
+slider2:Damping=0.5<0,1,0.01> // Damping
+slider3:Mix=0.3<0,1,0.01> // Wet/Dry Mix
+
+// GUI constants
+slider_height = 20;
+slider_width = 200;
+slider_y_start = 50;
+slider_x = 50;
+label_offset = 15;
+
+// @sample section
+@sample
+room_size = slider1;
+damping = slider2;
+mix = slider3;
+delay_samples = max_delay_samples * room_size;
+inL = spl0;
+inR = spl1;
+outL = delay_bufferL[delay_index];
+outR = delay_bufferR[delay_index];
+delay_bufferL[delay_index] = inL + damping * outL;
+delay_bufferR[delay_index] = inR + damping * outR;
+delay_index += 1;
+delay_index %= delay_samples;
+spl0 = (1 - mix) * inL + mix * outL;
+spl1 = (1 - mix) * inR + mix * outR;
+
+// @gfx section: Drawing the graphical user interface
+@gfx
+gfx_clear = gfx_clear;
+
+// Set font for labels
+gfx_setfont(1, "Arial", 14);
+
+// Room Size slider
+gfx_x = slider_x;
+gfx_y = slider_y_start;
+gfx_r = slider_color;
+gfx_g = slider_color;
+gfx_b = slider_color;
+gfx_a = 1;
+gfx_rect(gfx_x, gfx_y, slider_width * room_size, slider_height); // Draw filled rectangle as slider
+gfx_set(font_color); // Set text color
+gfx_x = slider_x;
+gfx_y -= label_offset;
+gfx_printf("Room Size: %.2f", room_size); // Label
+
+// Damping slider
+gfx_y = slider_y_start + 40;
+gfx_rect(gfx_x, gfx_y, slider_width * damping, slider_height);
+gfx_x = slider_x;
+gfx_y -= label_offset;
+gfx_printf("Damping: %.2f", damping);
+
+// Mix slider
+gfx_y = slider_y_start + 80;
+gfx_rect(gfx_x, gfx_y, slider_width * mix, slider_height);
+gfx_x = slider_x;
+gfx_y -= label_offset;
+gfx_printf("Mix: %.2f", mix);
+
+// Mouse control for sliders
+mouse_x = gfx_mouse_x;
+mouse_y = gfx_mouse_y;
+mouse_cap = gfx_mouse_cap;
+
+function handle_slider(slider_pos, slider_val, y_pos) (
+    // Check if mouse is over slider area and clicked
+    mouse_in_range = mouse_x > slider_x && mouse_x < (slider_x + slider_width) && mouse_y > y_pos && mouse_y < (y_pos + slider_height);
+    mouse_in_range && (mouse_cap & 1) ? slider_val = (mouse_x - slider_x) / slider_width : slider_val;
+);
+
+// Update slider values with mouse handling
+slider1 = handle_slider(slider_x, slider1, slider_y_start);
+slider2 = handle_slider(slider_x, slider2, slider_y_start + 40);
+slider3 = handle_slider(slider_x, slider3, slider_y_start + 80);
