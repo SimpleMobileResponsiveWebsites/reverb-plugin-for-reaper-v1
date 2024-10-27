@@ -175,6 +175,52 @@ To use this plugin in REAPER:
 Copy the code into a new JSFX effect
 Save it in your REAPER Effects folder
 Load it on any track or send
-  
+
+
+inspired by the Relab LX480 Rossowreverblx480v1 Key features include:
+
+Visual Elements:
+
+
+Red LED display showing frequency response
+Program selection buttons
+Parameter sliders with visual feedback
+Professional gray/red color scheme matching the original
+
+
+Programs:
+
+
+Hall
+Random Hall
+Plate
+Room
+Chamber
+Random Space
+Dual Echo
+Twin Delays
+
+
+Parameters:
+
+
+Decay Time
+Predelay
+Size
+Diffusion
+Low/High Decay
+Bass/Treble controls
+Input/Output levels
+Dry/Wet mix
+
+
+DSP Features:
+
+
+Multi-mode algorithmic reverb
+Modulation system for random variations
+Frequency-dependent decay
+Early reflections processing
+High-quality diffusion network  
 
 
