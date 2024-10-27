@@ -26,8 +26,8 @@ Create a new folder for your effects if you like, and create a new file with the
 Step 2: Create the Basic Structure of the Plugin
 Paste the following code into your .jsfx file. This code will implement a basic reverb with controls for room size, damping, and mix (wet/dry) balance.
 
-c
-Copy code
+
+
 desc: Simple Reverb
 // Tags: reverb, delay
 // A simple reverb plugin for Reaper using delay lines for reverb effect.
