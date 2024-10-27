@@ -136,3 +136,45 @@ The sliders should now affect the Room Size, Damping, and Mix parameters in real
 This setup provides a basic but functional GUI for the reverb effect. The simplicity of JSFX’s drawing tools limits the design somewhat, but you can use additional graphical functions, like gfx_line, gfx_circle, and others, for more complex interfaces.
 
 
+
+Here are the key features Of the Rossow Reverb LiquidSonic:
+
+Controls:
+
+
+Size: Controls the room size of the reverb
+Predelay: Adds initial delay before the reverb
+Chorus: Adds modulation to the reverb tail
+Width: Controls the stereo width
+Decay: Controls how long the reverb tail lasts
+Output: Controls the output level (-12dB to +12dB)
+Dry/Wet: Controls the mix between dry and wet signal
+
+
+GUI Features:
+
+
+Professional dark theme matching the reference image
+Knob-based controls with value displays
+VU meter for output monitoring
+Clean, organized layout
+Smooth parameter control
+
+
+DSP Features:
+
+
+High-quality stereo reverb algorithm
+Modulation section for chorus effects
+Width control for stereo image adjustment
+Predelay buffer for initial delay
+Smooth parameter interpolation
+
+To use this plugin in REAPER:
+
+Copy the code into a new JSFX effect
+Save it in your REAPER Effects folder
+Load it on any track or send
+  
+
+
