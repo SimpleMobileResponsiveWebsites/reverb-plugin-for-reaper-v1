@@ -1,0 +1,56 @@
+desc: Simple Reverb
+// Tags: reverb, delay
+// A simple reverb plugin for Reaper using delay lines for reverb effect.
+
+// @init section: initialize variables
+@init
+// Default parameter values
+room_size = 0.5;
+damping = 0.5;
+mix = 0.3;
+
+// Delay buffer sizes
+max_delay_samples = 44100; // Max delay of ~1 second for 44100 Hz sample rate
+delay_bufferL = 0;
+delay_bufferR = 0;
+delay_index = 0;
+
+// Initialize delay buffers
+delay_bufferL = max_delay_samples;
+delay_bufferR = max_delay_samples;
+loop(44100, delay_bufferL[0] = delay_bufferR[0] = 0;); // Clear buffers
+
+// @slider section: user-adjustable parameters
+slider1:Room Size=0.5<0,1,0.01> // Room size, affects delay length
+slider2:Damping=0.5<0,1,0.01> // Damping, controls feedback level
+slider3:Mix=0.3<0,1,0.01> // Wet/Dry Mix
+
+// @sample section: per-sample processing
+@sample
+// Convert sliders to local variables
+room_size = slider1;
+damping = slider2;
+mix = slider3;
+
+// Calculate delay length based on room size
+delay_samples = max_delay_samples * room_size;
+
+// Process left and right channels separately
+inL = spl0;
+inR = spl1;
+
+// Get delayed samples
+outL = delay_bufferL[delay_index];
+outR = delay_bufferR[delay_index];
+
+// Write input samples to the delay buffer with feedback
+delay_bufferL[delay_index] = inL + damping * outL;
+delay_bufferR[delay_index] = inR + damping * outR;
+
+// Update delay buffer index
+delay_index += 1;
+delay_index %= delay_samples;
+
+// Mix dry and wet signals
+spl0 = (1 - mix) * inL + mix * outL;
+spl1 = (1 - mix) * inR + mix * outR;
